@@ -50,95 +50,63 @@ async def send_secret_message(session_name, recipient, message, image_path):
                     await client.send_file(entity, file=image, caption=message)
                     print('Secret message sent!')
                     time.sleep(30)
-                    with open("usernames.txt", "r") as f:
-                        recipients = f.readlines()
-                    recipients.remove(recipient + '\n')
-                    with open("usernames.txt", "w") as f:
-                        f.writelines(recipients)
                     log_message(recipient, 'Sent')
+                    return True
                 except FloodWaitError as e:
                     print(
                         f'Flood limit exceeded. Sleeping for {e.seconds} seconds...')
                     await asyncio.sleep(e.seconds)
                     log_message(recipient, 'Failed')
+                    return False
                 except Exception as e:
-                    print(
-                        colorama.Fore.RED + f"[x] Failed to send Shill {recipient} Session {session_name}, {session_name.title()}. Error: {e}{Fore.RESET}")
-                    print('[x] skipping..........')
+                    if "Too many requests" in str(e):
+                        print(
+                            f"{Fore.RED}Too many requests error occurred for {session_name}. Skipping...{Fore.RESET}")
+                        # Mark the session as excluded
+                        with open("excluded_sessions.txt", "a") as f:
+                            f.write(f"{session_name}\n")
                     log_message(recipient, 'Failed')
-                    print(colorama.Fore.GREEN +
-                          f"[✓] Changing Account.......... ")
-                    print(colorama.Fore.GREEN +
-                          f"[✓] {session_name}..........")
-                    print(Style.RESET_ALL)
-                    with open("usernames.txt", "r") as f:
-                        recipients = f.readlines()
-                    recipients.remove(recipient + '\n')
-                    with open("usernames.txt", "w") as f:
-                        f.writelines(recipients)
-                    # Remove the session file from the folder
-
                     return False
             else:
                 print(f'User {recipient} is not currently online. Skipping...')
                 log_message(recipient, 'Failed')
-        except PhoneNumberInvalidError:
-            print("Failed session")
+                return False
+        except (PhoneNumberInvalidError, UsernameInvalidError):
+            print("Invalid phone number or username. Skipping...")
             log_message(recipient, 'Failed')
             return False
-        except UsernameInvalidError:
-            print(f'Invalid username: {recipient}. Skipping...')
-            with open("usernames.txt", "r") as f:
-                recipients = f.readlines()
-            recipients.remove(recipient + '\n')
-            with open("usernames.txt", "w") as f:
-                f.writelines(recipients)
-            log_message(recipient, 'Failed')
         except Exception as e:
             if "Too many requests" in str(e):
                 print(
                     f"{Fore.RED}Too many requests error occurred for {session_name}. Skipping...{Fore.RESET}")
-                # Update the last error timestamp for the session
-                log_message(recipient, 'Failed')
-                return False
-            elif "A wait of" in str(e):
-                print(
-                    f"{Fore.RED}Failed to send Shill to {user.username} Session {session_name}, {session_name.title()}. Error: {e}{Fore.RESET}")
-                print("Skipping...")
-                log_message(recipient, 'Failed')
-                with open("usernames.txt", "r") as f:
-                    recipients = f.readlines()
-                recipients.remove(recipient + '\n')
-                with open("usernames.txt", "w") as f:
-                    f.writelines(recipients)
-                return False
-            else:
-                print(colorama.Fore.RED +
-                      f"[x] Failed to send Shill {recipient} Session {session_name}, {session_name.title()}. Error: {e}{Fore.RESET}")
-                print('[x] skipping..........')
-                log_message(recipient, 'Failed')
-                print(colorama.Fore.GREEN +
-                      f"[✓] Changing Account.......... ")
-                print(colorama.Fore.GREEN + f"[✓] {session_name}..........")
-                print(Style.RESET_ALL)
-                with open("usernames.txt", "r") as f:
-                    recipients = f.readlines()
-                recipients.remove(recipient + '\n')
-                with open("usernames.txt", "w") as f:
-                    f.writelines(recipients)
-                # Remove the session file from the folder
-
-                return False
-        # Close the client session
-        await client.disconnect()
-    return False
+                # Mark the session as excluded
+                with open("excluded_sessions.txt", "a") as f:
+                    f.write(f"{session_name}\n")
+            log_message(recipient, 'Failed')
+            return False
 
 
-# Main function to send secret messages
+# Function to check if a session should be excluded
+def should_exclude_session(session_name):
+    excluded_sessions = []
+
+    if os.path.exists("excluded_sessions.txt"):
+        with open("excluded_sessions.txt", "r") as f:
+            excluded_sessions = f.read().splitlines()
+
+    return session_name in excluded_sessions
+
+
 async def main():
-    # Read session names from the session folder
+    colorama.init()
+    # Get a list of session names from the session folder
     session_names = [file for file in os.listdir(
         session_folder) if file.endswith('.session')]
+
+    # Remove excluded sessions from the list of session names
+    session_names = [
+        session_name for session_name in session_names if not should_exclude_session(session_name)]
+
     session_cycle = itertools.cycle(session_names)
     current_session = next(session_cycle)  # Initialize with the first session
 
@@ -172,6 +140,14 @@ async def main():
         if not os.path.isfile(session_path):
             print(
                 f"Session file {current_session} not found. Skipping recipient {recipient}.")
+            continue
+
+        # Check if the current session has encountered too many requests
+        if should_exclude_session(current_session):
+            print(
+                f"{Fore.RED}Current session {current_session} has encountered too many requests. Skipping recipient {recipient}.{Fore.RESET}")
+            failure_count += 1
+            current_session = next(session_cycle)
             continue
 
         # Send the secret message to the recipient using the current session
