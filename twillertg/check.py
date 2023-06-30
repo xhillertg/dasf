@@ -5,8 +5,11 @@ from telethon import TelegramClient, errors
 api_id = 20918706
 api_hash = 'a7de8dabdc9206f91400d6dca0968ed9'
 
+valid_accounts = 0
+
 
 async def send_mes_to_users(client):
+    global valid_accounts
     # Perform actions with the authorized client
     # Add your desired code here
 
@@ -17,11 +20,13 @@ async def send_mes_to_users(client):
 
     # Disconnect the client
     await client.disconnect()
+    valid_accounts += 1
 
 
 async def check_sessions():
+    global valid_accounts
     # Specify the path to the "accounts" folder in Termux
-    accounts_folder = "/data/data/com.termux/files/home/twillertg/accounts"
+    accounts_folder = "accounts"
 
     # Iterate over the session files in the accounts folder
     for file_name in os.listdir(accounts_folder):
@@ -64,7 +69,9 @@ loop = asyncio.get_event_loop()
 loop.run_until_complete(check_sessions())
 
 # Specify the path to excluded_sessions.txt in Termux
-excluded_file_path = "/data/data/com.termux/files/home/twillertg/excluded_sessions.txt"
+excluded_file_path = "excluded_sessions.txt"
 if os.path.isfile(excluded_file_path):
     os.remove(excluded_file_path)
     print("Deleted excluded_sessions.txt")
+
+print(f"Number of valid accounts: {valid_accounts}")
