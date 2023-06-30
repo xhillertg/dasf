@@ -10,8 +10,8 @@ from telethon.tl.types import UserStatusOnline, UserStatusRecently, UserStatusOf
 import pytz
 
 # Set up your Telegram API credentials
-api_id = 20918706
-api_hash = 'a7de8dabdc9206f91400d6dca0968ed9'
+api_id = 29393268
+api_hash = '4cb45217fc8a9ef2df4a4c6487d25cd2'
 
 # Function to join a channel using a specific session
 
@@ -84,6 +84,15 @@ def add_members_to_channel(client, channel_username):
                     print(
                         f"{Fore.GREEN}User status: {user_status.__class__.__name__}{Style.RESET_ALL}")
                     if isinstance(user_status, UserStatusRecently):
+                        print(f"{Fore.YELLOW}Last online: N/A{Style.RESET_ALL}")
+                        client(InviteToChannelRequest(
+                            channel_username, [user]))
+                        added_members.append(member)
+                        print(
+                            f"{Fore.GREEN}Added {member} to the channel{Style.RESET_ALL}")
+                        remove_member_from_file(member)
+                        time.sleep(10)
+                    elif isinstance(user_status, UserStatusOnline):
                         print(f"{Fore.YELLOW}Last online: N/A{Style.RESET_ALL}")
                         client(InviteToChannelRequest(
                             channel_username, [user]))
